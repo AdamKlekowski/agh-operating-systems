@@ -11,6 +11,7 @@ Zakończenie działania następuje po odebraniu od współrozmówcy komunikatu: 
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <signal.h>
 
 #define MAXBUFLEN 100
 
@@ -59,6 +60,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    int p_pid = getpid();
+
     if ((pid = fork()) == -1) {
         perror("Fork");
         exit(EXIT_FAILURE);
@@ -66,12 +69,6 @@ int main(int argc, char *argv[]) {
 
     if (pid == 0) {
         while(1){
-            if (strcmp(buf, "Bye\n") == 0 || strcmp(buf, "bye\n") == 0) {
-                printf("Koniec\n");
-                close(sockfd);
-                exit(EXIT_SUCCESS);
-            }
-
             if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
                                      (struct sockaddr *)&their_addr, &addr_len)) == -1) {
                 perror("recvfrom");
@@ -79,15 +76,15 @@ int main(int argc, char *argv[]) {
             }
             buf[numbytes] = '\0';
             printf(">%s", buf);
-        }
-    } else {
-        while(1){
+
             if (strcmp(buf, "Bye\n") == 0 || strcmp(buf, "bye\n") == 0) {
-                printf("Koniec\n");
+                kill(pid, SIGKILL);
                 close(sockfd);
                 exit(EXIT_SUCCESS);
             }
-
+        }
+    } else {
+        while(1){
             if (fgets(buf, MAXBUFLEN, stdin) == NULL) {
                 perror("fgets");
                 continue;
@@ -97,6 +94,12 @@ int main(int argc, char *argv[]) {
                                    (struct sockaddr *)&their_addr, sizeof their_addr)) == -1) {
                 perror("sendto");
                 exit(EXIT_FAILURE);
+            }
+
+            if (strcmp(buf, "Bye\n") == 0 || strcmp(buf, "bye\n") == 0) {
+                kill(p_pid, SIGKILL);
+                close(sockfd);
+                exit(EXIT_SUCCESS);
             }
         }
     }
